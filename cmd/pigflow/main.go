@@ -4,13 +4,24 @@ import (
 	"context"
 	"github.com/wyw14/solo-036/internal/api"
 	"github.com/wyw14/solo-036/internal/service"
+	"github.com/wyw14/solo-036/internal/telemetry"
 	"log"
 	"net/http"
 	"os"
+	"strconv"
+	"time"
 )
 
 func main() {
 	runtime := service.NewRuntime()
+	lateAfter, lostAfter := telemetry.DefaultLateAfter, telemetry.DefaultLostAfter
+	if value, err := strconv.Atoi(os.Getenv("PIGFLOW_TELEMETRY_LATE_MS")); err == nil {
+		lateAfter = time.Duration(value) * time.Millisecond
+	}
+	if value, err := strconv.Atoi(os.Getenv("PIGFLOW_TELEMETRY_LOST_MS")); err == nil {
+		lostAfter = time.Duration(value) * time.Millisecond
+	}
+	runtime.ConfigureTelemetry(lateAfter, lostAfter)
 	if dataDirectory := os.Getenv("PIGFLOW_DATA_DIR"); dataDirectory != "" {
 		if err := runtime.ConfigurePersistence(dataDirectory); err != nil {
 			log.Fatal(err)

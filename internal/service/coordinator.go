@@ -9,9 +9,11 @@ import (
 	"github.com/wyw14/solo-036/internal/receiver"
 	"github.com/wyw14/solo-036/internal/route"
 	"github.com/wyw14/solo-036/internal/run"
+	"github.com/wyw14/solo-036/internal/telemetry"
 	"github.com/wyw14/solo-036/internal/tracker"
 	"github.com/wyw14/solo-036/internal/valve"
 	"sync"
+	"time"
 )
 
 type Runtime struct {
@@ -26,6 +28,7 @@ type Runtime struct {
 	Valves     *valve.Controller
 	Receiver   *receiver.Controller
 	Compressor *compressor.Worker
+	Telemetry  *telemetry.Recorder
 	mu         sync.Mutex
 	control    *ControlState
 }
@@ -42,5 +45,13 @@ func NewRuntime() *Runtime {
 	valves := valve.NewController(p)
 	recv := receiver.NewController()
 	worker := compressor.NewWorker(p, runs)
-	return &Runtime{Runs: runs, Routes: routes, Tracker: tracks, Lineage: lineage, Journal: journalStore, Pressure: p, Permits: permits, Launcher: launch, Valves: valves, Receiver: recv, Compressor: worker, control: defaultControlState()}
+	telemetryRecorder := telemetry.NewRecorder(telemetry.DefaultLateAfter, telemetry.DefaultLostAfter)
+	return &Runtime{Runs: runs, Routes: routes, Tracker: tracks, Lineage: lineage, Journal: journalStore, Pressure: p, Permits: permits, Launcher: launch, Valves: valves, Receiver: recv, Compressor: worker, Telemetry: telemetryRecorder, control: defaultControlState()}
+}
+
+func (r *Runtime) ConfigureTelemetry(lateAfter, lostAfter time.Duration) {
+	if lateAfter <= 0 || lostAfter <= lateAfter {
+		return
+	}
+	r.Telemetry = telemetry.NewRecorder(lateAfter, lostAfter)
 }
