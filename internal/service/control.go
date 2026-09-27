@@ -705,20 +705,27 @@ func (r *Runtime) HealthDetails() map[string]any {
 	}
 	ready := validationError == nil && run.Health(r.Runs) && tracker.Ready(r.Tracker) && launcher.Ready(r.Launcher)
 	recoverySteps := NewRecoveryPlan().Steps()
+	profiles := r.Health.Profiles(snapshot.CapturedAt)
+	profilesByState := make(map[string]int)
+	for _, profile := range profiles {
+		profilesByState[string(profile.State)]++
+	}
 	return map[string]any{
-		"status":              map[bool]string{true: "ok", false: "degraded"}[ready],
-		"ready":               ready,
-		"revision":            snapshot.Revision,
-		"active_runs":         len(run.Active(r.Runs)),
-		"journal_events":      len(r.Journal.Events()),
-		"persistent_sequence": sequence,
-		"persistent_checksum": checksum,
-		"validation_error":    errorText(validationError),
-		"route_leases":        len(route.Snapshot(r.Routes)),
-		"emergency_safe":      emergency.Safe(r.Pressure),
-		"pressure_samples":    len(r.Pressure.History()),
-		"recovery_steps":      recoverySteps,
-		"captured_at":         snapshot.CapturedAt,
+		"status":                map[bool]string{true: "ok", false: "degraded"}[ready],
+		"ready":                 ready,
+		"revision":              snapshot.Revision,
+		"active_runs":           len(run.Active(r.Runs)),
+		"journal_events":        len(r.Journal.Events()),
+		"persistent_sequence":   sequence,
+		"persistent_checksum":   checksum,
+		"validation_error":      errorText(validationError),
+		"route_leases":          len(route.Snapshot(r.Routes)),
+		"emergency_safe":        emergency.Safe(r.Pressure),
+		"pressure_samples":      len(r.Pressure.History()),
+		"recovery_steps":        recoverySteps,
+		"device_profiles_total": len(profiles),
+		"device_profiles_state": profilesByState,
+		"captured_at":           snapshot.CapturedAt,
 	}
 }
 

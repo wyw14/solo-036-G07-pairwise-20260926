@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"io"
@@ -63,6 +64,33 @@ func decodeBody(w http.ResponseWriter, r *http.Request, destination any) error {
 		return errors.New("request body must contain one JSON value")
 	}
 	return nil
+}
+
+// decodeBodyRaw 与 decodeBody 严格性一致（1 MiB 上限、DisallowUnknownFields、
+// 仅允许一个 JSON 值、非空），额外把请求体逐字字符串返回，用于留存原始报文。
+func decodeBodyRaw(w http.ResponseWriter, r *http.Request, destination any) (string, error) {
+	reader := http.MaxBytesReader(w, r.Body, requestLimit)
+	defer reader.Close()
+	data, err := io.ReadAll(reader)
+	if err != nil {
+		return "", err
+	}
+	if len(bytes.TrimSpace(data)) == 0 {
+		return "", errors.New("request body is required")
+	}
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(destination); err != nil {
+		if errors.Is(err, io.EOF) {
+			return "", errors.New("request body is required")
+		}
+		return "", err
+	}
+	var extra any
+	if err := decoder.Decode(&extra); !errors.Is(err, io.EOF) {
+		return "", errors.New("request body must contain one JSON value")
+	}
+	return string(data), nil
 }
 
 func writeJSON(w http.ResponseWriter, status int, value any) {
